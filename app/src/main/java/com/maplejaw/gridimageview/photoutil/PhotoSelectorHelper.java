@@ -55,7 +55,6 @@ public class PhotoSelectorHelper {
 
 		if(!cursor.isClosed()){
 			cursor.close();
-			cursor=null;
 		}
 
 		return photos;

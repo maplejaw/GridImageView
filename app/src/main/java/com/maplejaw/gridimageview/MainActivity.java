@@ -30,6 +30,11 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent=new Intent(MainActivity.this,SelectorActivity.class);
                 startActivityForResult(intent,1234);
             }
+
+            @Override
+            protected int getShowStyle() {
+                return GridImageView.STYLE_VERTICAL;
+            }
         } );
     }
 
@@ -46,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
                 List<String> list = data.getStringArrayListExtra("list");
                 //  PictureUtil.cropPhoto(this, Uri.parse("file://"+list.get(0)));
                 mGridImageView.setImageData(list,true);
+                List<String> l=mGridImageView.getImgDataList();
                 break;
 
         }

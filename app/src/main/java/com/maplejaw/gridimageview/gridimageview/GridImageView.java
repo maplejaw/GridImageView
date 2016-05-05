@@ -2,14 +2,22 @@ package com.maplejaw.gridimageview.gridimageview;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.Scroller;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class GridImageView<T> extends ViewGroup {
+    public final static int STYLE_GRID= 0;     // 竖直风格
+    public final static int STYLE_HORIZONTAL = 1;     // 水平风格
+    private int mShowStyle=STYLE_HORIZONTAL;     // 显示风格，默认是竖直的
+
 
     private GridImageViewAdapter<T> mAdapter;
     private List<T> mImgDataList=new ArrayList<>();
@@ -18,8 +26,20 @@ public class GridImageView<T> extends ViewGroup {
     private int mGridSize; //每个条目的大小
     private ImageView mAddView;//添加图片的按钮
 
+    private Scroller mScroller;
+    private VelocityTracker mVelocityTracker;
+    private int mTouchSlop;
+    private int mLeftBorder;
+    private int mRightBorder;
+
     public GridImageView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+        //初始化Scroller实例
+        mScroller = new Scroller(context);
+        //初始化一个最小滑动距离
+        mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+
+
         mAddView=new ImageView(context);
         mAddView.setOnClickListener(new OnClickListener() {//添加mAddView
             @Override
@@ -41,7 +61,34 @@ public class GridImageView<T> extends ViewGroup {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {//测量GridImageView占据的大小
+        if(mShowStyle==STYLE_HORIZONTAL){
+            measureHorizontal(widthMeasureSpec,heightMeasureSpec);
+        }else{
+            measureVertical(widthMeasureSpec,heightMeasureSpec);
+        }
 
+
+    }
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        if(mShowStyle==STYLE_HORIZONTAL){
+            layoutHorizontal(changed,l,t,r,b);
+        }else {
+            layoutVertical(changed,l,t,r,b);
+        }
+
+    }
+
+    private void measureHorizontal(int widthMeasureSpec, int heightMeasureSpec){
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int height;
+        int totalWidth = width - getPaddingLeft() - getPaddingRight();
+        mGridSize = (totalWidth - mGap * (mColumnCount - 1)) / mColumnCount-10; //算出每个条目的大小，以宽度为标准。
+        height = mGridSize  + getPaddingTop() + getPaddingBottom();//计算出高度
+        setMeasuredDimension(width, height);
+    }
+
+    private void measureVertical(int widthMeasureSpec, int heightMeasureSpec){
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height;
         int totalWidth = width - getPaddingLeft() - getPaddingRight();
@@ -50,12 +97,39 @@ public class GridImageView<T> extends ViewGroup {
         int mRowCount= (int) Math.ceil((totalCount*1.0)/mColumnCount);//算出行数
         height = mGridSize * mRowCount + mGap * (mRowCount - 1) + getPaddingTop() + getPaddingBottom();//计算出高度
         setMeasuredDimension(width, height);
-
     }
 
 
-    @Override
-    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+    private void layoutHorizontal(boolean changed, int l, int t, int r, int b) {
+        int childrenCount = mImgDataList.size();
+        for (int i = 0; i < childrenCount; i++) {
+            ImageView childrenView = (ImageView) getChildAt(i);
+
+            if (mAdapter != null) {
+                mAdapter.onDisplayImage(getContext(), childrenView, mImgDataList.get(i));
+            }
+           // int rowNum = i / mColumnCount;
+           // int columnNum = i % mColumnCount;
+            int left = (mGridSize + mGap) * i + getPaddingLeft();
+            int top =  getPaddingTop();
+            int right = left + mGridSize;
+            int bottom = top + mGridSize;
+            childrenView.layout(left, top, right, bottom);
+        }
+
+
+        int left = (mGridSize + mGap) * childrenCount + getPaddingLeft();
+        int top = getPaddingTop();
+        int right = left + mGridSize;
+        int bottom = top + mGridSize;
+        mAddView.layout(left, top, right, bottom);//调整mAddView的位置
+
+        // 初始化左右边界值
+        mLeftBorder=getChildAt(0).getLeft();
+        mRightBorder=getChildAt(childrenCount).getRight();
+    }
+
+    private void layoutVertical(boolean changed, int l, int t, int r, int b) {
         int childrenCount = mImgDataList.size();
         for (int i = 0; i < childrenCount; i++) {
             ImageView childrenView = (ImageView) getChildAt(i);
@@ -84,7 +158,20 @@ public class GridImageView<T> extends ViewGroup {
 
 
 
-    //根据数据，调整ImageView的数量
+    @Override
+    public void computeScroll() {
+
+        if (mScroller.computeScrollOffset()) {
+            scrollTo(mScroller.getCurrX(), mScroller.getCurrY());
+            postInvalidate();
+        }
+    }
+
+    /**
+     * 设置图片数据集合
+     * @param lists 数据集合
+     * @param clearLastData 是否清理上次的数据
+     */
     public void setImageData(List<T> lists,boolean clearLastData) {
         if (lists == null || lists.isEmpty()) {
             return;
@@ -150,6 +237,7 @@ public class GridImageView<T> extends ViewGroup {
     public void setAdapter(GridImageViewAdapter<T> adapter) {
         mAdapter = adapter;
         mAddView.setImageResource(adapter.generateAddIcon());
+        mShowStyle=adapter.getShowStyle();
     }
 
 
@@ -191,5 +279,100 @@ public class GridImageView<T> extends ViewGroup {
         refreshDataSet();
     }
 
+
+
+
+
+
+    //===============================以下为滚动效果相关=============================
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent event) {
+        //触摸点
+        float x = event.getX();
+        switch(event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mLastX = x; //记住开始落下的屏幕点
+                break;
+            case MotionEvent.ACTION_MOVE:
+                int detaX = (int) (x-mLastX);
+                if(Math.abs(detaX)>mTouchSlop){
+                    return true;
+                }
+                break;
+        }
+
+
+      return super.onInterceptTouchEvent(event);
+    }
+
+    private float mLastX;//记录上次滑动的位置
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        boolean isTouch=false;
+        acquireVelocityTracker(event);
+
+        //触摸点
+        float x = event.getX();
+        switch(event.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                if(mScroller != null){
+                    if(!mScroller.isFinished()){
+                        mScroller.abortAnimation();
+                    }
+                }
+                mLastX = x ;
+
+           //     acquireVelocityTracker(event);
+
+                isTouch=false;
+                break ;
+            case MotionEvent.ACTION_MOVE:
+                int detaX = (int)(mLastX-x); //每次滑动屏幕，屏幕应该移动的距离
+                scrollBy(detaX, 0);
+                mLastX = x ;
+                isTouch=true;
+
+                break ;
+            case MotionEvent.ACTION_CANCEL://松开时判断有没有划出边界，如果划出便还原。
+            case MotionEvent.ACTION_UP:
+                int dX = (int)( x-mLastX);
+                if (getScrollX() + dX < mLeftBorder) {
+                    scrollTo(mLeftBorder, 0);
+                } else if (getScrollX() + getWidth() + dX > mRightBorder) {
+                    if(mRightBorder-mLeftBorder>getWidth()){
+                        scrollTo(mRightBorder - getWidth(), 0);
+                    }else{
+                        scrollTo(mLeftBorder, 0);
+                    }
+                }else{
+                  /*  mVelocityTracker.computeCurrentVelocity(1000);
+                    int speed= (int) mVelocityTracker.getXVelocity();
+                    if(speed>100){
+                        mScroller.startScroll(getScrollX(),0,mRightBorder - getWidth(),0);
+                    }*/
+
+                }
+                isTouch=false;
+             //   releaseVelocityTracker();
+                break;
+        }
+        return isTouch;
+    }
+
+
+    private void acquireVelocityTracker(MotionEvent event) {
+        if(null == mVelocityTracker) {
+            mVelocityTracker = VelocityTracker.obtain();
+        }
+        mVelocityTracker.addMovement(event);
+    }
+    private void releaseVelocityTracker() {
+        if(null != mVelocityTracker) {
+            mVelocityTracker.clear();
+            mVelocityTracker.recycle();
+            mVelocityTracker = null;
+        }
+    }
 }
 
