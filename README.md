@@ -2,9 +2,11 @@
 
 一个高仿微信，QQ，微博，贴吧等选择上传图片时的展示控件，继承自ViewGroup，支持网格排列，以及横向排列，使用起来超级简单。
 ## 效果图
-* 网格布局
+* 网格布局   
+
 <img src="images/image1.png"  width="50%"/>
-* 水平布局
+* 水平布局   
+
 <img src="images/image2.png"  width="50%"/>
 
 ## 使用说明
