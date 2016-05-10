@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.maplejaw.gridimageview.gridimageview.GridImageView;
 import com.maplejaw.gridimageview.gridimageview.GridImageViewAdapter;
@@ -33,7 +34,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             protected int getShowStyle() {
-                return GridImageView.STYLE_VERTICAL;
+                return GridImageView.STYLE_GRID;
+            }
+
+            @Override
+            protected void onItemImageClick(Context context, int index, List<String> list) {
+                super.onItemImageClick(context, index, list);
+                Toast.makeText(getApplicationContext(),"--->"+index,Toast.LENGTH_SHORT).show();
             }
         } );
     }

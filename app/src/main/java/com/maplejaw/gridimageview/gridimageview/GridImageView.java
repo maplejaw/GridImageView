@@ -14,9 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GridImageView<T> extends ViewGroup {
-    public final static int STYLE_GRID= 0;     // 竖直风格
+    public final static int STYLE_GRID= 0;     // 网格风格
     public final static int STYLE_HORIZONTAL = 1;     // 水平风格
-    private int mShowStyle=STYLE_HORIZONTAL;     // 显示风格，默认是竖直的
+    private int mShowStyle=STYLE_GRID;     // 显示风格，默认是网格风格
 
 
     private GridImageViewAdapter<T> mAdapter;
@@ -26,9 +26,13 @@ public class GridImageView<T> extends ViewGroup {
     private int mGridSize; //每个条目的大小
     private ImageView mAddView;//添加图片的按钮
 
+    /**
+     * 处理滑动的
+     */
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
     private int mTouchSlop;
+    private int minFlingSpeed,maxFlingSpeed;
     private int mLeftBorder;
     private int mRightBorder;
 
@@ -36,9 +40,10 @@ public class GridImageView<T> extends ViewGroup {
         super(context, attrs, defStyle);
         //初始化Scroller实例
         mScroller = new Scroller(context);
-        //初始化一个最小滑动距离
+        //初始化参数
         mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-
+        minFlingSpeed=ViewConfiguration.get(getContext()).getScaledMinimumFlingVelocity();
+        maxFlingSpeed=ViewConfiguration.get(getContext()).getScaledMaximumFlingVelocity();
 
         mAddView=new ImageView(context);
         mAddView.setOnClickListener(new OnClickListener() {//添加mAddView
@@ -67,7 +72,6 @@ public class GridImageView<T> extends ViewGroup {
             measureVertical(widthMeasureSpec,heightMeasureSpec);
         }
 
-
     }
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
@@ -83,7 +87,7 @@ public class GridImageView<T> extends ViewGroup {
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height;
         int totalWidth = width - getPaddingLeft() - getPaddingRight();
-        mGridSize = (totalWidth - mGap * (mColumnCount - 1)) / mColumnCount-10; //算出每个条目的大小，以宽度为标准。
+        mGridSize = (totalWidth - mGap * (mColumnCount - 1)) / mColumnCount; //算出每个条目的大小，以宽度为标准。
         height = mGridSize  + getPaddingTop() + getPaddingBottom();//计算出高度
         setMeasuredDimension(width, height);
     }
@@ -108,8 +112,6 @@ public class GridImageView<T> extends ViewGroup {
             if (mAdapter != null) {
                 mAdapter.onDisplayImage(getContext(), childrenView, mImgDataList.get(i));
             }
-           // int rowNum = i / mColumnCount;
-           // int columnNum = i % mColumnCount;
             int left = (mGridSize + mGap) * i + getPaddingLeft();
             int top =  getPaddingTop();
             int right = left + mGridSize;
@@ -127,6 +129,14 @@ public class GridImageView<T> extends ViewGroup {
         // 初始化左右边界值
         mLeftBorder=getChildAt(0).getLeft();
         mRightBorder=getChildAt(childrenCount).getRight();
+
+        if(mShowStyle==STYLE_HORIZONTAL){
+            if(mRightBorder-mLeftBorder>getWidth()){
+                scrollTo(mRightBorder - getWidth(),0);
+            }else{
+                scrollTo(mLeftBorder,0);
+            }
+        }
     }
 
     private void layoutVertical(boolean changed, int l, int t, int r, int b) {
@@ -223,6 +233,7 @@ public class GridImageView<T> extends ViewGroup {
                 public void onDelClickL() {
                     mImgDataList.remove(position);
                     refreshDataSet();
+
                 }
             });
             return imageView;
@@ -289,14 +300,20 @@ public class GridImageView<T> extends ViewGroup {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         //触摸点
+
         float x = event.getX();
         switch(event.getAction()) {
             case MotionEvent.ACTION_DOWN:
+                if(mScroller != null){
+                    if(!mScroller.isFinished()){
+                        mScroller.abortAnimation();
+                    }
+                }
                 mLastX = x; //记住开始落下的屏幕点
                 break;
             case MotionEvent.ACTION_MOVE:
                 int detaX = (int) (x-mLastX);
-                if(Math.abs(detaX)>mTouchSlop){
+                if(Math.abs(detaX)>mTouchSlop&&mShowStyle==STYLE_HORIZONTAL){
                     return true;
                 }
                 break;
@@ -311,7 +328,6 @@ public class GridImageView<T> extends ViewGroup {
     public boolean onTouchEvent(MotionEvent event) {
         boolean isTouch=false;
         acquireVelocityTracker(event);
-
         //触摸点
         float x = event.getX();
         switch(event.getAction()){
@@ -322,41 +338,41 @@ public class GridImageView<T> extends ViewGroup {
                     }
                 }
                 mLastX = x ;
-
-           //     acquireVelocityTracker(event);
-
                 isTouch=false;
+
                 break ;
             case MotionEvent.ACTION_MOVE:
                 int detaX = (int)(mLastX-x); //每次滑动屏幕，屏幕应该移动的距离
-                scrollBy(detaX, 0);
-                mLastX = x ;
-                isTouch=true;
-
-                break ;
-            case MotionEvent.ACTION_CANCEL://松开时判断有没有划出边界，如果划出便还原。
-            case MotionEvent.ACTION_UP:
-                int dX = (int)( x-mLastX);
-                if (getScrollX() + dX < mLeftBorder) {
-                    scrollTo(mLeftBorder, 0);
-                } else if (getScrollX() + getWidth() + dX > mRightBorder) {
+                if (getScrollX() + detaX < mLeftBorder) {//判断有没有划出边界，如果划出便还原。
+                    scrollTo(mLeftBorder,0);
+                }else if (getScrollX() + getWidth() + detaX > mRightBorder) {
                     if(mRightBorder-mLeftBorder>getWidth()){
-                        scrollTo(mRightBorder - getWidth(), 0);
+                        scrollTo(mRightBorder - getWidth(),0);
+
                     }else{
-                        scrollTo(mLeftBorder, 0);
+                        scrollTo(mLeftBorder,0);
                     }
                 }else{
-                  /*  mVelocityTracker.computeCurrentVelocity(1000);
-                    int speed= (int) mVelocityTracker.getXVelocity();
-                    if(speed>100){
-                        mScroller.startScroll(getScrollX(),0,mRightBorder - getWidth(),0);
-                    }*/
-
+                    scrollBy(detaX, 0);
                 }
-                isTouch=false;
-             //   releaseVelocityTracker();
+
+                mLastX = x ;
+                isTouch=true;
+                break ;
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_UP:
+                  isTouch=false;
+                  mVelocityTracker.computeCurrentVelocity(1000,maxFlingSpeed);
+                  int speed= (int) mVelocityTracker.getXVelocity();
+                  if(Math.abs(speed)>minFlingSpeed){
+                        mScroller.fling(getScrollX(), 0, -speed, 0, mLeftBorder, mRightBorder-getWidth(), 0, 0);
+                        invalidate();
+                    }
+                releaseVelocityTracker();
                 break;
         }
+
+
         return isTouch;
     }
 

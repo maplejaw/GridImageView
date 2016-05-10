@@ -39,6 +39,18 @@
             protected void onAddClick(Context context, List<String> list) {
                //这里是点击添加按钮时的回调。list为已有图片的集合，常用于记住上次选择的图片
             }
+			 @Override
+            protected int getShowStyle() {
+                return GridImageView.STYLE_GRID;
+				  //这里配置显示风格，有网格和水平布局
+            }
+
+            @Override
+            protected void onItemImageClick(Context context, int index, List<String> list) {
+                super.onItemImageClick(context, index, list);
+                Toast.makeText(getApplicationContext(),"--->"+index,Toast.LENGTH_SHORT).show();
+				//是每个图片的点击事件
+            }
         } );
  ```
 3. 添加数据
