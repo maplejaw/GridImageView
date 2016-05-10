@@ -130,12 +130,10 @@ public class GridImageView<T> extends ViewGroup {
         mLeftBorder=getChildAt(0).getLeft();
         mRightBorder=getChildAt(childrenCount).getRight();
 
-        if(mShowStyle==STYLE_HORIZONTAL){
-            if(mRightBorder-mLeftBorder>getWidth()){
-                scrollTo(mRightBorder - getWidth(),0);
-            }else{
-                scrollTo(mLeftBorder,0);
-            }
+        if(mRightBorder-mLeftBorder>getWidth()){
+            scrollTo(mRightBorder - getWidth(),0);
+        }else{
+            scrollTo(mLeftBorder,0);
         }
     }
 
